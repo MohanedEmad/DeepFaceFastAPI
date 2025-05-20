@@ -1,9 +1,14 @@
 services:
   # A Docker web service
+  - services:
   - type: web
-    name: fastapi-example
-    runtime: python
+    name: deepface-fastapi
     plan: free
+<<<<<<< HEAD
     autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+=======
+    env: docker
+    autoDeploy: true
+>>>>>>> 6b016cd (updated render)
