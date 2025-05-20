@@ -12,7 +12,7 @@ DETECTOR_BACKEND = "mtcnn"
 DB_PATH = "images"
 DISTANCE_THRESHOLD = 0.6
 ATTENDANCE_LOG = "attendance_log.txt"
-UNIVERSITY_COORDS = (30.02051, 31.00357)  # Example coordinates
+UNIVERSITY_COORDS = (29,96764, 31.94514)  # Example coordinates
 MAX_DISTANCE_METERS = 10000
 
 # Load model on startup
