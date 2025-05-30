@@ -11,13 +11,13 @@ MODEL_NAME = "Facenet512"
 DETECTOR_BACKEND = "mtcnn"
 DB_PATH = "images"
 DISTANCE_THRESHOLD = 0.6
-ATTENDANCE_LOG = "attendance_log.txt"
-UNIVERSITY_COORDS = (29,96764, 31.94514)  # Example coordinates
+ATTENDANCE_LOG = "/tmp/attendance_log.txt"  # Safe path on Render
+UNIVERSITY_COORDS = (29.96764, 31.94514)     # Corrected coordinates
 MAX_DISTANCE_METERS = 10000
 
-# Load model on startup
+# Initialize app and preload model
 app = FastAPI()
-DeepFace.build_model(MODEL_NAME)
+face_model = DeepFace.build_model(MODEL_NAME)
 
 
 @app.post("/mark-attendance/")
@@ -27,20 +27,22 @@ async def mark_attendance(
     longitude: float = Form(...)
 ):
     try:
-        # Save the uploaded image
-        saved_path = f"temp_{file.filename}"
-        with open(saved_path, "wb") as buffer:
+        # Save uploaded image to /tmp
+        temp_path = f"/tmp/{file.filename}"
+        with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Perform face recognition
+        # Run face recognition
         results = DeepFace.find(
-            img_path=saved_path,
+            img_path=temp_path,
             db_path=DB_PATH,
             model_name=MODEL_NAME,
+            model=face_model,
             detector_backend=DETECTOR_BACKEND,
             enforce_detection=True
         )
 
+        # Check if results exist
         if len(results) > 0 and not results[0].empty:
             best_match = results[0].iloc[0]
             identity_path = best_match['identity']
@@ -48,6 +50,7 @@ async def mark_attendance(
             confidence = best_match['distance']
 
             if confidence < DISTANCE_THRESHOLD:
+                # Check GPS location
                 user_location = (latitude, longitude)
                 distance = geodesic(user_location, UNIVERSITY_COORDS).meters
 
@@ -56,7 +59,7 @@ async def mark_attendance(
                     with open(ATTENDANCE_LOG, 'a') as log_file:
                         log_file.write(f"{timestamp} - {person_name} - {confidence:.2f}\n")
 
-                    os.remove(saved_path)
+                    os.remove(temp_path)
                     return JSONResponse(status_code=200, content={
                         "status": "success",
                         "message": f"✅ Attendance marked for {person_name}",
@@ -64,23 +67,22 @@ async def mark_attendance(
                         "confidence": confidence,
                         "distance_to_university": distance
                     })
-
                 else:
-                    os.remove(saved_path)
+                    os.remove(temp_path)
                     return JSONResponse(status_code=400, content={
                         "status": "failure",
                         "message": "❌ User is not within campus range",
                         "distance_to_university": distance
                     })
             else:
-                os.remove(saved_path)
+                os.remove(temp_path)
                 return JSONResponse(status_code=400, content={
                     "status": "failure",
                     "message": "❌ Face match confidence too low",
                     "confidence": confidence
                 })
         else:
-            os.remove(saved_path)
+            os.remove(temp_path)
             return JSONResponse(status_code=404, content={
                 "status": "failure",
                 "message": "❌ No match found in the database"
